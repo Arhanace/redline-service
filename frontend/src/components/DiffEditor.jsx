@@ -20,18 +20,27 @@ function computeChanges(oldText, newText) {
     tailNew--;
   }
 
-  // Extract the changed region with enough unique context to identify it
-  const CONTEXT = 80;
-  const ctxStart = Math.max(0, firstDiff - CONTEXT);
-  const oldRegion = oldText.slice(ctxStart, tailOld + CONTEXT);
-  const newRegion = newText.slice(ctxStart, tailNew + CONTEXT);
+  // Start with the minimal changed text, then expand context only if needed for uniqueness
+  const changedOld = oldText.slice(firstDiff, tailOld);
+  const changedNew = newText.slice(firstDiff, tailNew);
 
-  // The target is the old region, replacement is the new region
-  // This is precise — exactly the text that changed plus context for uniqueness
-  const targetText = oldText.slice(ctxStart, tailOld);
-  const replacement = newText.slice(ctxStart, tailNew);
+  if (!changedOld && !changedNew) return [];
 
-  if (!targetText && !replacement) return [];
+  // Expand context incrementally until the target is unique in the document
+  let ctx = 0;
+  let targetText = changedOld;
+  let replacement = changedNew;
+  while (ctx < 200) {
+    const start = Math.max(0, firstDiff - ctx);
+    targetText = oldText.slice(start, tailOld + ctx);
+    replacement = newText.slice(start, tailNew + ctx);
+
+    // Check if target is unique (only one occurrence)
+    const firstPos = oldText.indexOf(targetText);
+    const secondPos = oldText.indexOf(targetText, firstPos + 1);
+    if (secondPos === -1) break; // unique — we're done
+    ctx += 20;
+  }
 
   return [{ operation: 'replace', target: { text: targetText, occurrence: 1 }, replacement }];
 }
